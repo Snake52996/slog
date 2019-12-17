@@ -112,7 +112,6 @@ namespace SnakeLog{
                 if(!var_outputted){
                     cerr<<"提供了多余的参数.该参数为:\n"<<message;
                 }
-                buf_<<"\n";
                 output_target_<<buf_.str();
                 buf_.str("");
             }
