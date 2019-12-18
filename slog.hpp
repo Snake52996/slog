@@ -94,6 +94,11 @@ namespace SnakeLog{
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
             inline const string& name()const noexcept{return this->logger_name_;}
             inline void name(const string& logger_name)noexcept{this->logger_name_ = logger_name;}
+            void log(const char* output_string){
+                buf_<<output_string;
+                output_target_<<buf_.str();
+                buf_.str("");
+            }
             template<typename T>
             void log(const char* format, const T& message){
                 bool var_outputted = false;
