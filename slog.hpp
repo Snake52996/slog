@@ -8,6 +8,7 @@ _Pragma("once");
 #include<algorithm>
 #include<sstream>
 #include<ctime>     // 处理时间
+#include<cstring>   // strcmp
 using namespace std;
 namespace SnakeLog{
     /**
@@ -21,45 +22,7 @@ namespace SnakeLog{
         FATAL,      ///< 致命错误信息
         SILENCE     ///< 不输出错误信息
     };
-    struct DateTime{
-        int year_;
-        int month_;
-        int day_;
-        DateTime(){
-            /*
-            auto temp_tm_time = localtime(time(NULL));
-            year_ = temp_tm_time->tm_year;
-            month_ = temp_tm_time->tm_mon;
-            day_ = temp_tm_time->tm_mday;
-            delete temp_tm_time;
-            */
-           this->update();
-        }
-        bool operator==(const DateTime& b)const{
-            return (this->day_ == b.day_) && (this->year_ == b.year_) && (this->month_ == b.month_);
-        }
-        bool operator==(const tm& b)const{
-            return (this->day_ == b.tm_mday) && (this->year_ == b.tm_year) && (this->month_ == b.tm_mon);
-        }
-        bool operator==(const time_t& b)const{
-            auto temp_tm_time = localtime(&b);
-            bool return_value = *this == *temp_tm_time;
-            delete temp_tm_time;
-            return return_value;
-        }
-        void update(){
-            auto time0 = time(NULL);
-            auto temp_tm_time = localtime(&time0);
-            year_ = temp_tm_time->tm_year;
-            month_ = temp_tm_time->tm_mon;
-            day_ = temp_tm_time->tm_mday;
-            delete temp_tm_time;
-        }
-        string to_string(){
-            return std::to_string(year_) + (month_ / 10 ? "" : "0") + std::to_string(month_) + (day_ / 10 ? "" : "0") + std::to_string(day_);
-        }
-    };
-    string getLocalTime(){
+    static string __getLocalTime(){
         auto time0 = time(NULL);
         auto tm_time = *localtime(&time0);
         char temp_str[512];
@@ -113,20 +76,34 @@ namespace SnakeLog{
         private:
             string working_dir_;
             ofstream output_file_;
-            DateTime file_time_;
+            std::tm file_time_;
+            char file_time_buf_[512];
+            char current_time_buf_[512];
+            void updateFileTime(){
+                auto time0 = time(NULL);
+                file_time_ = *localtime(&time0);
+                strftime(file_time_buf_, 512, "%Y-%m-%d", &file_time_);
+            }
+            bool isSameDay(){
+                auto time0 = time(NULL);
+                auto current_tm = *localtime(&time0);
+                strftime(current_time_buf_, 512, "%Y-%m-%d", &current_tm);
+                return (strcmp(current_time_buf_, file_time_buf_) == 0);
+            }
         public:
             DailyLogFile() = default;
             DailyLogFile(const string& working_dir){
                 working_dir_ = working_dir;
-                output_file_.open(working_dir_ + file_time_.to_string(), ios::app);
+                this->updateFileTime();
+                output_file_.open(working_dir_ + file_time_buf_, ios::app);
             }
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
                 // 检查时间
-                if(!(file_time_ == time(NULL))){
+                if(!isSameDay()){
                     output_file_.close();
-                    file_time_.update();
-                    output_file_.open(working_dir_ + file_time_.to_string(), ios::app);
+                    this->updateFileTime();
+                    output_file_.open(working_dir_ + file_time_buf_, ios::app);
                 }
                 if(!output_file_.is_open()){
                     cerr<<"文件打开失败.\n";
@@ -163,7 +140,9 @@ namespace SnakeLog{
         public:
             BasicLog() = delete;
             BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = "", const bool& show_time = true){
-                OUT_TARGET_T temp_target(using_path);
+                string temp = using_path;
+                if(using_path.back() != '/') temp.push_back('/');
+                OUT_TARGET_T temp_target(temp);
                 this->output_target_ = move(temp_target);
                 this->log_level_ = log_level;
                 this->logger_name_ = logger_name;
@@ -178,8 +157,7 @@ namespace SnakeLog{
             void log(const char* output_string){
                 if(is_first_){
                     if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
-                    if(show_time_) buf_<<"["<<getLocalTime()<<"]";
-                    is_first_ = false;
+                    if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
                 }
                 buf_<<output_string;
                 output_target_<<buf_.str();
@@ -189,7 +167,7 @@ namespace SnakeLog{
             void log(const char* format, const T& message){
                 if(is_first_){
                     if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
-                    if(show_time_) buf_<<"["<<getLocalTime()<<"]";
+                    if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
                     is_first_ = false;
                 }
                 bool var_outputted = false;
@@ -210,12 +188,13 @@ namespace SnakeLog{
                 }
                 output_target_<<buf_.str();
                 buf_.str("");
+                is_first_ = true;
             }
             template<typename T, typename... ARG>
             void log(const char* format, const T& first_value, ARG...args){
                 if(is_first_){
                     if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
-                    if(show_time_) buf_<<"["<<getLocalTime()<<"]";
+                    if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
                     is_first_ = false;
                 }
                 while(*format){
@@ -271,4 +250,5 @@ namespace SnakeLog{
    typedef BasicLog<Console> ConsoleLog;
    typedef BasicLog<ofstream> FileLog;
    typedef BasicLog<LoopLogFile> LoopFileLog;
+   typedef BasicLog<DailyLogFile> DailyLog;
 }
