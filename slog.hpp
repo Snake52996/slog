@@ -7,6 +7,7 @@ _Pragma("once");
 #include<string>
 #include<algorithm>
 #include<sstream>
+#include<ctime>     // 处理时间
 using namespace std;
 namespace SnakeLog{
     /**
@@ -17,8 +18,55 @@ namespace SnakeLog{
         DEBUG,      ///< 调试信息
         WARNING,    ///< 警告信息
         ERROR,      ///< 错误信息
-        FATAL       ///< 致命错误信息
+        FATAL,      ///< 致命错误信息
+        SILENCE     ///< 不输出错误信息
     };
+    struct DateTime{
+        int year_;
+        int month_;
+        int day_;
+        DateTime(){
+            /*
+            auto temp_tm_time = localtime(time(NULL));
+            year_ = temp_tm_time->tm_year;
+            month_ = temp_tm_time->tm_mon;
+            day_ = temp_tm_time->tm_mday;
+            delete temp_tm_time;
+            */
+           this->update();
+        }
+        bool operator==(const DateTime& b)const{
+            return (this->day_ == b.day_) && (this->year_ == b.year_) && (this->month_ == b.month_);
+        }
+        bool operator==(const tm& b)const{
+            return (this->day_ == b.tm_mday) && (this->year_ == b.tm_year) && (this->month_ == b.tm_mon);
+        }
+        bool operator==(const time_t& b)const{
+            auto temp_tm_time = localtime(&b);
+            bool return_value = *this == *temp_tm_time;
+            delete temp_tm_time;
+            return return_value;
+        }
+        void update(){
+            auto time0 = time(NULL);
+            auto temp_tm_time = localtime(&time0);
+            year_ = temp_tm_time->tm_year;
+            month_ = temp_tm_time->tm_mon;
+            day_ = temp_tm_time->tm_mday;
+            delete temp_tm_time;
+        }
+        string to_string(){
+            return std::to_string(year_) + (month_ / 10 ? "" : "0") + std::to_string(month_) + (day_ / 10 ? "" : "0") + std::to_string(day_);
+        }
+    };
+    string getLocalTime(){
+        auto time0 = time(NULL);
+        auto tm_time = *localtime(&time0);
+        char temp_str[512];
+        strftime(temp_str, 512, "%Y-%m-%d %H:%M:%S", &tm_time);
+        string temp_string = temp_str;
+        return temp_string;
+    }
     /**
      * @brief 封装循环日志文件
      * 提供与ofstream完全一致的<<操作符操作,在接受一次输出之前检查当前文件的大小,若大于限定则轮转文件.覆盖最老的文件(若文件数量已达规定的上限)
@@ -61,6 +109,33 @@ namespace SnakeLog{
                 return *this;
             }
     };
+    class DailyLogFile{
+        private:
+            string working_dir_;
+            ofstream output_file_;
+            DateTime file_time_;
+        public:
+            DailyLogFile() = default;
+            DailyLogFile(const string& working_dir){
+                working_dir_ = working_dir;
+                output_file_.open(working_dir_ + file_time_.to_string(), ios::app);
+            }
+            template<typename T>
+            DailyLogFile& operator<<(const T& output_message){
+                // 检查时间
+                if(!(file_time_ == time(NULL))){
+                    output_file_.close();
+                    file_time_.update();
+                    output_file_.open(working_dir_ + file_time_.to_string(), ios::app);
+                }
+                if(!output_file_.is_open()){
+                    cerr<<"文件打开失败.\n";
+                    return *this;
+                }
+                output_file_<<output_message;
+                return *this;
+            }
+    };
     /**
      * @brief 封装cout
      * 提供一致化的输出方式并不对cout造成非预期的更改
@@ -77,30 +152,46 @@ namespace SnakeLog{
     };
     template<typename OUT_TARGET_T>
     class BasicLog{
+        private:
+            bool is_first_ = true;
         protected:
             LogLevel log_level_;
             string logger_name_;
+            bool show_time_;
             OUT_TARGET_T output_target_;
             stringstream buf_;
         public:
             BasicLog() = delete;
-            BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = ""){
+            BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = "", const bool& show_time = true){
                 OUT_TARGET_T temp_target(using_path);
                 this->output_target_ = move(temp_target);
                 this->log_level_ = log_level;
                 this->logger_name_ = logger_name;
+                this->show_time_ = show_time;
             }
             inline const LogLevel& level()const noexcept{return this->log_level_;}
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
             inline const string& name()const noexcept{return this->logger_name_;}
             inline void name(const string& logger_name)noexcept{this->logger_name_ = logger_name;}
+            inline bool showTime()const noexcept{return this->show_time_;}
+            inline void showTime(const bool& show_time)noexcept{this->show_time_ = show_time;}
             void log(const char* output_string){
+                if(is_first_){
+                    if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
+                    if(show_time_) buf_<<"["<<getLocalTime()<<"]";
+                    is_first_ = false;
+                }
                 buf_<<output_string;
                 output_target_<<buf_.str();
                 buf_.str("");
             }
             template<typename T>
             void log(const char* format, const T& message){
+                if(is_first_){
+                    if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
+                    if(show_time_) buf_<<"["<<getLocalTime()<<"]";
+                    is_first_ = false;
+                }
                 bool var_outputted = false;
                 while(*format){
                     if(*format == '{' && *(format + 1) == '}'){
@@ -122,6 +213,11 @@ namespace SnakeLog{
             }
             template<typename T, typename... ARG>
             void log(const char* format, const T& first_value, ARG...args){
+                if(is_first_){
+                    if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
+                    if(show_time_) buf_<<"["<<getLocalTime()<<"]";
+                    is_first_ = false;
+                }
                 while(*format){
                     if(*format == '{' && *(format + 1) == '}'){
                         // 输出变量
@@ -139,36 +235,36 @@ namespace SnakeLog{
             template<typename... ARG>
             void info(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::INFO) return;
-                if(this->logger_name_ != "") buf_<<"[ "<<this->logger_name_<<" | I ] ";
-                else buf_<<"[ I ] ";
+                buf_<<"[I]";
+                is_first_ = true;
                 return this->log(format, args...);
             }
             template<typename... ARG>
             void debug(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::DEBUG) return;
-                if(this->logger_name_ != "") buf_<<"[ "<<this->logger_name_<<" | D ] ";
-                else buf_<<"[ D ] ";
+                buf_<<"[D]";
+                is_first_ = true;
                 return this->log(format, args...);
             }
             template<typename... ARG>
             void warning(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::WARNING) return;
-                if(this->logger_name_ != "") buf_<<"[ "<<this->logger_name_<<" | W ] ";
-                else buf_<<"[ W ] ";
+                buf_<<"[W]";
+                is_first_ = true;
                 return this->log(format, args...);
             }
             template<typename... ARG>
             void error(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::ERROR) return;
-                if(this->logger_name_ != "") buf_<<"[ "<<this->logger_name_<<" | E ] ";
-                else buf_<<"[ E ] ";
+                buf_<<"[E]";
+                is_first_ = true;
                 return this->log(format, args...);
             }
             template<typename... ARG>
             void fatal(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::FATAL) return;
-                if(this->logger_name_ != "") buf_<<"[ "<<this->logger_name_<<" | F ] ";
-                else buf_<<"[ F ] ";
+                buf_<<"[F]";
+                is_first_ = true;
                 return this->log(format, args...);
             }
     };
