@@ -2,13 +2,19 @@
  * @brief 超轻型日志工具
 */
 _Pragma("once");
+#if defined(_WIN32) || defined(_WIN64)
+	#define _WINDOWS
+#elif defined(__linux) || defined(__linux__)
+	#define _LINUX
+#endif
 #include<fstream>
 #include<iostream>
 #include<string>
 #include<algorithm>
 #include<sstream>
-#include<ctime>     // 处理时间
-#include<cstring>   // strcmp
+#include<ctime>         // tm time_t time() localtime() strftime()
+#include<cstring>       // strcmp
+#include<type_traits>   // is_same
 using namespace std;
 namespace SnakeLog{
     /**
@@ -16,7 +22,6 @@ namespace SnakeLog{
     */
     enum class LogLevel{
         INFO,       ///< 普通信息
-        DEBUG,      ///< 调试信息
         WARNING,    ///< 警告信息
         ERROR,      ///< 错误信息
         FATAL,      ///< 致命错误信息
@@ -131,12 +136,16 @@ namespace SnakeLog{
     class BasicLog{
         private:
             bool is_first_ = true;
+            #ifdef _LINUX
+            bool is_colored_ = false;
+            #endif
         protected:
             LogLevel log_level_;
             string logger_name_;
             bool show_time_;
             OUT_TARGET_T output_target_;
             stringstream buf_;
+            bool is_console_ = false;
         public:
             BasicLog() = delete;
             BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = "", const bool& show_time = true){
@@ -147,6 +156,7 @@ namespace SnakeLog{
                 this->log_level_ = log_level;
                 this->logger_name_ = logger_name;
                 this->show_time_ = show_time;
+                if(is_same<OUT_TARGET_T, Console>()) this->is_console_ = true;
             }
             inline const LogLevel& level()const noexcept{return this->log_level_;}
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
@@ -160,6 +170,12 @@ namespace SnakeLog{
                     if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
                 }
                 buf_<<output_string;
+                #ifdef _LINUX
+                if(is_colored_){
+                    buf_<<"\033[0m";
+                    is_colored_ = false;
+                }
+                #endif
                 output_target_<<buf_.str();
                 buf_.str("");
             }
@@ -186,6 +202,12 @@ namespace SnakeLog{
                 if(!var_outputted){
                     cerr<<"提供了多余的参数.该参数为:\n"<<message;
                 }
+                #ifdef _LINUX
+                if(is_colored_){
+                    buf_<<"\033[0m";
+                    is_colored_ = false;
+                }
+                #endif
                 output_target_<<buf_.str();
                 buf_.str("");
                 is_first_ = true;
@@ -209,25 +231,33 @@ namespace SnakeLog{
                     ++format;
                 }
                 cerr<<"提供了过多的多余的参数.拒绝打印该日志.\n";
+                #ifdef _LINUX
+                is_colored_ = false;
+                #endif
                 buf_.str("");
             }
             template<typename... ARG>
             void info(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::INFO) return;
+                #ifdef _LINUX
+                if(this->is_console_){
+                    buf_<<"\033[37m";
+                    is_colored_ = true;
+                }
+                #endif
                 buf_<<"[I]";
-                is_first_ = true;
-                return this->log(format, args...);
-            }
-            template<typename... ARG>
-            void debug(const char* format, ARG...args){
-                if(this->log_level_ > LogLevel::DEBUG) return;
-                buf_<<"[D]";
                 is_first_ = true;
                 return this->log(format, args...);
             }
             template<typename... ARG>
             void warning(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::WARNING) return;
+                #ifdef _LINUX
+                if(this->is_console_){
+                    buf_<<"\033[35m";
+                    is_colored_ = true;
+                }
+                #endif
                 buf_<<"[W]";
                 is_first_ = true;
                 return this->log(format, args...);
@@ -235,6 +265,12 @@ namespace SnakeLog{
             template<typename... ARG>
             void error(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::ERROR) return;
+                #ifdef _LINUX
+                if(this->is_console_){
+                    buf_<<"\033[33m";
+                    is_colored_ = true;
+                }
+                #endif
                 buf_<<"[E]";
                 is_first_ = true;
                 return this->log(format, args...);
@@ -242,6 +278,12 @@ namespace SnakeLog{
             template<typename... ARG>
             void fatal(const char* format, ARG...args){
                 if(this->log_level_ > LogLevel::FATAL) return;
+                #ifdef _LINUX
+                if(this->is_console_){
+                    buf_<<"\033[31m";
+                    is_colored_ = true;
+                }
+                #endif
                 buf_<<"[F]";
                 is_first_ = true;
                 return this->log(format, args...);
