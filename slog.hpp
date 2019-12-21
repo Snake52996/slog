@@ -81,6 +81,7 @@ namespace SnakeLog{
         private:
             string working_dir_;
             ofstream output_file_;
+            ofstream index_file_;
             std::tm file_time_;
             char file_time_buf_[512];
             char current_time_buf_[512];
@@ -101,6 +102,11 @@ namespace SnakeLog{
                 working_dir_ = working_dir;
                 this->updateFileTime();
                 output_file_.open(working_dir_ + file_time_buf_, ios::app);
+                index_file_.open(working_dir_ + ".index", ios::app);
+            }
+            ~DailyLogFile(){
+                if(output_file_.is_open()) output_file_.close();
+                if(index_file_.is_open()) index_file_.close();
             }
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
@@ -109,6 +115,7 @@ namespace SnakeLog{
                     output_file_.close();
                     this->updateFileTime();
                     output_file_.open(working_dir_ + file_time_buf_, ios::app);
+                    index_file_<<file_time_buf_<<endl;
                 }
                 if(!output_file_.is_open()){
                     cerr<<"文件打开失败.\n";
