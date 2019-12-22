@@ -192,7 +192,6 @@ namespace SnakeLog{
             BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = "", const bool& show_time = true){
                 string temp = using_path;
                 if(!is_same<OUT_TARGET_T, ofstream>()) if(using_path.back() != '/') temp.push_back('/');
-                cout<<temp<<endl;
                 OUT_TARGET_T temp_target(temp);
                 this->output_target_ = move(temp_target);
                 this->log_level_ = log_level;
