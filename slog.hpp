@@ -81,11 +81,9 @@ namespace SnakeLog{
         private:
             string working_dir_;
             ofstream* output_file_ = nullptr;
-            //ofstream index_file_;
             std::tm file_time_;
             char file_time_buf_[512];
             char current_time_buf_[512];
-            //bool current_date_recorded_ = false;
             void updateFileTime(){
                 auto time0 = time(NULL);
                 file_time_ = *localtime(&time0);
@@ -97,46 +95,58 @@ namespace SnakeLog{
                 strftime(current_time_buf_, 512, "%Y-%m-%d", &current_tm);
                 return (strcmp(current_time_buf_, file_time_buf_) == 0);
             }
+            void prepareFile(){
+                if(output_file_ != nullptr) return;
+                this->updateFileTime();
+                ifstream control_file(working_dir_ + ".new");
+                if(!control_file.is_open()){
+                    ofstream out_control_file(working_dir_ + ".new");
+                    out_control_file<<file_time_buf_;
+                    out_control_file.close();
+                    out_control_file.open(working_dir_ + ".index", ios::app);
+                    out_control_file<<file_time_buf_<<endl;
+                    out_control_file.close();
+                }else{
+                    string tmp_date;
+                    control_file>>tmp_date;
+                    if(tmp_date != file_time_buf_){
+                        ofstream out_control_file(working_dir_ + ".new");
+                        out_control_file<<file_time_buf_;
+                        out_control_file.close();
+                        out_control_file.open(working_dir_ + ".index", ios::app);
+                        out_control_file<<file_time_buf_<<endl;
+                        out_control_file.close();
+                    }
+                }
+                output_file_ = new ofstream(working_dir_ + file_time_buf_, ios::app);
+            }
         public:
             DailyLogFile() = default;
             DailyLogFile(const string& working_dir){
                 working_dir_ = working_dir;
-                this->updateFileTime();
-                ifstream index_file(working_dir_ + ".new");
-                if(!index_file.is_open()) return;
-                string newest_date;
-                index_file>>newest_date;
-                if(newest_date == file_time_buf_)
-                    output_file_ = new ofstream(working_dir_ + file_time_buf_, ios::app);
-                index_file.close();
-                //output_file_.open(working_dir_ + file_time_buf_, ios::app);
-                //index_file_.open(working_dir_ + ".index", ios::app);
             }
             ~DailyLogFile(){
-                if(output_file_ != nullptr && output_file_->is_open()){
+                if(output_file_ == nullptr) return;
+                if(output_file_->is_open()){
                     output_file_->close();
-                    delete output_file_;
                 }
+                delete output_file_;
+                output_file_ = nullptr;
             }
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
-                if(output_file_ == nullptr || !output_file_->is_open()){
-                    this->updateFileTime();
-                    ofstream index_file(working_dir_ + ".new");
-                    index_file<<file_time_buf_;
-                    index_file.close();
-                    if(output_file_ == nullptr)
-                        output_file_ = new ofstream(working_dir_ + file_time_buf_, ios::app);
-                    else
-                        output_file_->open(working_dir_ + file_time_buf_, ios::app);
-                }else{
+                if(output_file_ == nullptr) this->prepareFile();
+                else{
                     // 检查时间
                     if(!isSameDay()){
                         output_file_->close();
                         this->updateFileTime();
-                        ofstream index_file(working_dir_ + ".new");
-                        index_file<<file_time_buf_;
-                        index_file.close();
+                        ofstream control_file(working_dir_ + ".new");
+                        control_file<<file_time_buf_;
+                        control_file.close();
+                        control_file.open(working_dir_ + ".index", ios::app);
+                        control_file<<file_time_buf_<<endl;
+                        control_file.close();
                         output_file_->open(working_dir_ + file_time_buf_, ios::app);
                     }
                 }
@@ -144,7 +154,8 @@ namespace SnakeLog{
                     cerr<<"文件打开失败.\n";
                     return *this;
                 }
-                *output_file_<<output_message;
+                (*output_file_)<<output_message;
+                output_file_->flush();
                 return *this;
             }
     };
@@ -180,7 +191,8 @@ namespace SnakeLog{
             BasicLog() = delete;
             BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = "", const bool& show_time = true){
                 string temp = using_path;
-                if(using_path.back() != '/') temp.push_back('/');
+                if(!is_same<OUT_TARGET_T, ofstream>()) if(using_path.back() != '/') temp.push_back('/');
+                cout<<temp<<endl;
                 OUT_TARGET_T temp_target(temp);
                 this->output_target_ = move(temp_target);
                 this->log_level_ = log_level;
