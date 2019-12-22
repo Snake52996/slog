@@ -80,7 +80,7 @@ namespace SnakeLog{
     class DailyLogFile{
         private:
             string working_dir_;
-            ofstream output_file_;
+            ofstream* output_file_ = nullptr;
             //ofstream index_file_;
             std::tm file_time_;
             char file_time_buf_[512];
@@ -106,38 +106,45 @@ namespace SnakeLog{
                 if(!index_file.is_open()) return;
                 string newest_date;
                 index_file>>newest_date;
-                if(newest_date == file_time_buf_) output_file_.open(working_dir_ + file_time_buf_, ios::app);
+                if(newest_date == file_time_buf_)
+                    output_file_ = new ofstream(working_dir_ + file_time_buf_, ios::app);
                 index_file.close();
                 //output_file_.open(working_dir_ + file_time_buf_, ios::app);
                 //index_file_.open(working_dir_ + ".index", ios::app);
             }
             ~DailyLogFile(){
-                if(output_file_.is_open()) output_file_.close();
+                if(output_file_ != nullptr && output_file_->is_open()){
+                    output_file_->close();
+                    delete output_file_;
+                }
             }
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
-                if(!output_file_.is_open()){
+                if(output_file_ == nullptr || !output_file_->is_open()){
                     this->updateFileTime();
                     ofstream index_file(working_dir_ + ".new");
                     index_file<<file_time_buf_;
                     index_file.close();
-                    output_file_.open(working_dir_ + file_time_buf_, ios::app);
+                    if(output_file_ == nullptr)
+                        output_file_ = new ofstream(working_dir_ + file_time_buf_, ios::app);
+                    else
+                        output_file_->open(working_dir_ + file_time_buf_, ios::app);
                 }else{
                     // 检查时间
                     if(!isSameDay()){
-                        output_file_.close();
+                        output_file_->close();
                         this->updateFileTime();
                         ofstream index_file(working_dir_ + ".new");
                         index_file<<file_time_buf_;
                         index_file.close();
-                        output_file_.open(working_dir_ + file_time_buf_, ios::app);
+                        output_file_->open(working_dir_ + file_time_buf_, ios::app);
                     }
                 }
-                if(!output_file_.is_open()){
+                if(!output_file_->is_open()){
                     cerr<<"文件打开失败.\n";
                     return *this;
                 }
-                output_file_<<output_message;
+                *output_file_<<output_message;
                 return *this;
             }
     };
