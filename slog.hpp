@@ -167,25 +167,19 @@ namespace SnakeLog{
             LogLevel log_level_;
             string logger_name_;
             string time_format_;
-            OUT_TARGET_T* output_target_ = nullptr;
+            OUT_TARGET_T output_target_;
             stringstream buf_;
             bool is_console_ = false;
         public:
             BasicLog() = delete;
             template<typename STRING_TYPE_1, typename STRING_TYPE_2, typename...ARG>
-            BasicLog(const LogLevel& log_level, const STRING_TYPE_1& logger_name = "", const STRING_TYPE_2& time_format = "", ARG&&...args){
-                this->output_target_ = new OUT_TARGET_T(forward<ARG>(args)...);
-                this->log_level_ = log_level;
-                this->logger_name_ = logger_name;
-                this->time_format_ = time_format;
-                if(is_same<OUT_TARGET_T, Console>()) this->is_console_ = true;
+            BasicLog(const LogLevel& log_level, const STRING_TYPE_1& logger_name = "", const STRING_TYPE_2& time_format = "", ARG&&...args):output_target_(forward<ARG>(args)...){
+                log_level_ = log_level;
+                logger_name_ = logger_name;
+                time_format_ = time_format;
+                is_console_ = is_same<OUT_TARGET_T, Console>();
             }
-            ~BasicLog(){
-                if(output_target_ != nullptr){
-                    delete output_target_;
-                    output_target_ = nullptr;
-                }
-            }
+            ~BasicLog(){}
             inline const LogLevel& level()const noexcept{return this->log_level_;}
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
             inline const string& name()const noexcept{return this->logger_name_;}
@@ -204,7 +198,7 @@ namespace SnakeLog{
                     is_colored_ = false;
                 }
                 #endif
-                *output_target_<<buf_.str();
+                output_target_<<buf_.str();
                 buf_.str("");
             }
             template<typename T>
@@ -236,7 +230,7 @@ namespace SnakeLog{
                     is_colored_ = false;
                 }
                 #endif
-                *output_target_<<buf_.str();
+                output_target_<<buf_.str();
                 buf_.str("");
                 is_first_ = true;
             }
