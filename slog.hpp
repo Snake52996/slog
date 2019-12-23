@@ -10,7 +10,7 @@ _Pragma("once");
 #include<fstream>
 #include<iostream>
 #include<string>
-#include<algorithm>
+#include<algorithm>     // forward()
 #include<sstream>
 #include<ctime>         // tm time_t time() localtime() strftime()
 #include<cstring>       // strcmp
@@ -242,7 +242,7 @@ namespace SnakeLog{
                 is_first_ = true;
             }
             template<typename T, typename... ARG>
-            void log(const char* format, const T& first_value, ARG...args){
+            void log(const char* format, const T& first_value, ARG&&...args){
                 if(is_first_){
                     if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
                     if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
@@ -253,7 +253,7 @@ namespace SnakeLog{
                         // 输出变量
                         buf_<<first_value;
                         // 跳过"{}"
-                        return this->log(format + 2, args...);
+                        return this->log(format + 2, forward<ARG>(args)...);
                     }else{
                         buf_<<*format;
                     }
@@ -266,7 +266,7 @@ namespace SnakeLog{
                 buf_.str("");
             }
             template<typename... ARG>
-            void info(const char* format, ARG...args){
+            void info(const char* format, ARG&&...args){
                 if(this->log_level_ > LogLevel::INFO) return;
                 #ifdef _LINUX
                 if(this->is_console_){
@@ -276,10 +276,10 @@ namespace SnakeLog{
                 #endif
                 buf_<<"[I]";
                 is_first_ = true;
-                return this->log(format, args...);
+                return this->log(format, forward<ARG>(args)...);
             }
             template<typename... ARG>
-            void warning(const char* format, ARG...args){
+            void warning(const char* format, ARG&&...args){
                 if(this->log_level_ > LogLevel::WARNING) return;
                 #ifdef _LINUX
                 if(this->is_console_){
@@ -289,10 +289,10 @@ namespace SnakeLog{
                 #endif
                 buf_<<"[W]";
                 is_first_ = true;
-                return this->log(format, args...);
+                return this->log(format, forward<ARG>(args)...);
             }
             template<typename... ARG>
-            void error(const char* format, ARG...args){
+            void error(const char* format, ARG&&...args){
                 if(this->log_level_ > LogLevel::ERROR) return;
                 #ifdef _LINUX
                 if(this->is_console_){
@@ -302,10 +302,10 @@ namespace SnakeLog{
                 #endif
                 buf_<<"[E]";
                 is_first_ = true;
-                return this->log(format, args...);
+                return this->log(format, forward<ARG>(args)...);
             }
             template<typename... ARG>
-            void fatal(const char* format, ARG...args){
+            void fatal(const char* format, ARG&&...args){
                 if(this->log_level_ > LogLevel::FATAL) return;
                 #ifdef _LINUX
                 if(this->is_console_){
@@ -315,7 +315,7 @@ namespace SnakeLog{
                 #endif
                 buf_<<"[F]";
                 is_first_ = true;
-                return this->log(format, args...);
+                return this->log(format, forward<ARG>(args)...);
             }
     };
    typedef BasicLog<Console> ConsoleLog;
