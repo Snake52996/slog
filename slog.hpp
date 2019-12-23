@@ -48,7 +48,7 @@ namespace SnakeLog{
             string working_dir_;                        ///< 当前工作路径
             unsigned int current_index_;                ///< 当前的文件序号
         public:
-            LoopLogFile() = default;
+            LoopLogFile() = delete;
             LoopLogFile(const string& working_dir){
                 this->working_dir_ = working_dir;
                 this->current_index_ = 0;
@@ -81,7 +81,7 @@ namespace SnakeLog{
     class DailyLogFile{
         private:
             string working_dir_;
-            ofstream* output_file_ = nullptr;
+            ofstream output_file_;
             std::tm file_time_;
             char file_time_buf_[512];
             char current_time_buf_[512];
@@ -105,41 +105,36 @@ namespace SnakeLog{
                 control_file.close();
             }
         public:
-            DailyLogFile() = default;
-            DailyLogFile(const string& working_dir){
+            DailyLogFile() = delete;
+            DailyLogFile(const string& working_dir):output_file_(){
                 working_dir_ = working_dir;
-                output_file_ = new ofstream();
                 string temp_date;
                 ifstream control_file(working_dir_ + ".new");
                 if(control_file.is_open()){
                     control_file>>temp_date;
                     this->updateFileTime();
-                    if(temp_date == file_time_buf_) output_file_->open(working_dir_ + temp_date, ios::app);
+                    if(temp_date == file_time_buf_) output_file_.open(working_dir_ + temp_date, ios::app);
                     control_file.close();
                 }
             }
             ~DailyLogFile(){
-                if(output_file_ == nullptr) return;
-                if(output_file_->is_open()){
-                    output_file_->close();
+                if(output_file_.is_open()){
+                    output_file_.close();
                 }
-                delete output_file_;
-                output_file_ = nullptr;
             }
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
-                if(!isSameDay() && output_file_->is_open()) output_file_->close();
-                if(!output_file_->is_open()){
+                if(!isSameDay() && output_file_.is_open()) output_file_.close();
+                if(!output_file_.is_open()){
                     this->updateFileTime();
                     updateDate();
-                    output_file_->open(working_dir_ + file_time_buf_, ios::app);
+                    output_file_.open(working_dir_ + file_time_buf_, ios::app);
                 }
-                if(!output_file_->is_open()){
+                if(!output_file_.is_open()){
                     cerr<<"文件打开失败.\n";
                     return *this;
                 }
-                (*output_file_)<<output_message;
-                output_file_->flush();
+                output_file_<<output_message;
                 return *this;
             }
     };
