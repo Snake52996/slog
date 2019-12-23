@@ -168,7 +168,7 @@ namespace SnakeLog{
         public:
             BasicLog() = delete;
             template<typename STRING_TYPE_1, typename STRING_TYPE_2, typename...ARG>
-            BasicLog(const LogLevel& log_level, const STRING_TYPE_1& logger_name = "", const STRING_TYPE_2& time_format = "", ARG&&...args):output_target_(forward<ARG>(args)...){
+            BasicLog(const LogLevel& log_level, const STRING_TYPE_1& logger_name, const STRING_TYPE_2& time_format, ARG&&...args):output_target_(forward<ARG>(args)...){
                 log_level_ = log_level;
                 logger_name_ = logger_name;
                 time_format_ = time_format;
