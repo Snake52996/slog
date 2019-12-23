@@ -179,8 +179,8 @@ namespace SnakeLog{
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
             inline const string& name()const noexcept{return this->logger_name_;}
             inline void name(const string& logger_name)noexcept{this->logger_name_ = logger_name;}
-            inline bool showTime()const noexcept{return this->show_time_;}
-            inline void showTime(const bool& show_time)noexcept{this->show_time_ = show_time;}
+            inline const string& timeFormat()const noexcept{return this->time_format_;}
+            inline void timeFormat(const string& time_format)noexcept{this->time_format_ = time_format;}
             template<typename T>
             void log(const T& output_string){
                 if(is_first_){
