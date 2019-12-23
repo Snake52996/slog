@@ -10,7 +10,7 @@ _Pragma("once");
 #include<fstream>
 #include<iostream>
 #include<string>
-#include<algorithm>     // forward()
+#include<algorithm>     // forward() move()
 #include<sstream>
 #include<ctime>         // tm time_t time() localtime() strftime()
 #include<cstring>       // strcmp
@@ -27,11 +27,12 @@ namespace SnakeLog{
         FATAL,      ///< 致命错误信息
         SILENCE     ///< 不输出错误信息
     };
-    static string __getLocalTime(){
+    template<typename T>
+    static string __getLocalTime(const T& format){
         auto time0 = time(NULL);
         auto tm_time = *localtime(&time0);
         char temp_str[512];
-        strftime(temp_str, 512, "%Y-%m-%d %H:%M:%S", &tm_time);
+        strftime(temp_str, 512, format, &tm_time);
         string temp_string = temp_str;
         return temp_string;
     }
@@ -148,8 +149,7 @@ namespace SnakeLog{
     */
     class Console{
         public:
-            Console() = default;
-            Console(const string& meaningless){;}
+            Console(){;}
             template<typename T>
             Console& operator<< (const T& output_data){
                 cout<<output_data;
@@ -166,19 +166,18 @@ namespace SnakeLog{
         protected:
             LogLevel log_level_;
             string logger_name_;
-            bool show_time_;
+            string time_format_;
             OUT_TARGET_T* output_target_ = nullptr;
             stringstream buf_;
             bool is_console_ = false;
         public:
             BasicLog() = delete;
-            BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = "", const bool& show_time = true){
-                string temp = using_path;
-                if(!is_same<OUT_TARGET_T, ofstream>() && using_path.back() != '/') temp.push_back('/');
-                this->output_target_ = new OUT_TARGET_T(temp);
+            template<typename STRING_TYPE_1, typename STRING_TYPE_2, typename...ARG>
+            BasicLog(const LogLevel& log_level, const STRING_TYPE_1& logger_name = "", const STRING_TYPE_2& time_format = "", ARG&&...args){
+                this->output_target_ = new OUT_TARGET_T(forward<ARG>(args)...);
                 this->log_level_ = log_level;
                 this->logger_name_ = logger_name;
-                this->show_time_ = show_time;
+                this->time_format_ = time_format;
                 if(is_same<OUT_TARGET_T, Console>()) this->is_console_ = true;
             }
             ~BasicLog(){
@@ -196,7 +195,7 @@ namespace SnakeLog{
             void log(const char* output_string){
                 if(is_first_){
                     if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
-                    if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
+                    if(time_format_.size()) buf_<<"["<<__getLocalTime(time_format_.c_str())<<"]";
                 }
                 buf_<<output_string;
                 #ifdef _LINUX
@@ -212,7 +211,7 @@ namespace SnakeLog{
             void log(const char* format, const T& message){
                 if(is_first_){
                     if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
-                    if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
+                    if(time_format_.size()) buf_<<"["<<__getLocalTime(time_format_.c_str())<<"]";
                     is_first_ = false;
                 }
                 bool var_outputted = false;
@@ -245,7 +244,7 @@ namespace SnakeLog{
             void log(const char* format, const T& first_value, ARG&&...args){
                 if(is_first_){
                     if(logger_name_.size()) buf_<<"["<<logger_name_<<"]";
-                    if(show_time_) buf_<<"["<<__getLocalTime()<<"]";
+                    if(time_format_.size()) buf_<<"["<<__getLocalTime(time_format_.c_str())<<"]";
                     is_first_ = false;
                 }
                 while(*format){
