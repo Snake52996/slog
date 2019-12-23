@@ -184,20 +184,25 @@ namespace SnakeLog{
             LogLevel log_level_;
             string logger_name_;
             bool show_time_;
-            OUT_TARGET_T output_target_;
+            OUT_TARGET_T* output_target_ = nullptr;
             stringstream buf_;
             bool is_console_ = false;
         public:
             BasicLog() = delete;
             BasicLog(const string& using_path, const LogLevel& log_level = LogLevel::INFO, const string& logger_name = "", const bool& show_time = true){
                 string temp = using_path;
-                if(!is_same<OUT_TARGET_T, ofstream>()) if(using_path.back() != '/') temp.push_back('/');
-                OUT_TARGET_T temp_target(temp);
-                this->output_target_ = move(temp_target);
+                if(!is_same<OUT_TARGET_T, ofstream>() && using_path.back() != '/') temp.push_back('/');
+                this->output_target_ = new OUT_TARGET_T(temp);
                 this->log_level_ = log_level;
                 this->logger_name_ = logger_name;
                 this->show_time_ = show_time;
                 if(is_same<OUT_TARGET_T, Console>()) this->is_console_ = true;
+            }
+            ~BasicLog(){
+                if(output_target_ != nullptr){
+                    delete output_target_;
+                    output_target_ = nullptr;
+                }
             }
             inline const LogLevel& level()const noexcept{return this->log_level_;}
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
@@ -217,7 +222,7 @@ namespace SnakeLog{
                     is_colored_ = false;
                 }
                 #endif
-                output_target_<<buf_.str();
+                *output_target_<<buf_.str();
                 buf_.str("");
             }
             template<typename T>
@@ -249,7 +254,7 @@ namespace SnakeLog{
                     is_colored_ = false;
                 }
                 #endif
-                output_target_<<buf_.str();
+                *output_target_<<buf_.str();
                 buf_.str("");
                 is_first_ = true;
             }
