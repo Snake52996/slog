@@ -95,35 +95,27 @@ namespace SnakeLog{
                 strftime(current_time_buf_, 512, "%Y-%m-%d", &current_tm);
                 return (strcmp(current_time_buf_, file_time_buf_) == 0);
             }
-            void prepareFile(){
-                if(output_file_ != nullptr) return;
-                this->updateFileTime();
-                ifstream control_file(working_dir_ + ".new");
-                if(!control_file.is_open()){
-                    ofstream out_control_file(working_dir_ + ".new");
-                    out_control_file<<file_time_buf_;
-                    out_control_file.close();
-                    out_control_file.open(working_dir_ + ".index", ios::app);
-                    out_control_file<<file_time_buf_<<endl;
-                    out_control_file.close();
-                }else{
-                    string tmp_date;
-                    control_file>>tmp_date;
-                    if(tmp_date != file_time_buf_){
-                        ofstream out_control_file(working_dir_ + ".new");
-                        out_control_file<<file_time_buf_;
-                        out_control_file.close();
-                        out_control_file.open(working_dir_ + ".index", ios::app);
-                        out_control_file<<file_time_buf_<<endl;
-                        out_control_file.close();
-                    }
-                }
-                output_file_ = new ofstream(working_dir_ + file_time_buf_, ios::app);
+            void updateDate(){
+                ofstream control_file(working_dir_ + ".new");
+                control_file<<file_time_buf_;
+                control_file.close();
+                control_file.open(working_dir_ + ".index", ios::app);
+                control_file<<file_time_buf_<<endl;
+                control_file.close();
             }
         public:
             DailyLogFile() = default;
             DailyLogFile(const string& working_dir){
                 working_dir_ = working_dir;
+                output_file_ = new ofstream();
+                string temp_date;
+                ifstream control_file(working_dir_ + ".new");
+                if(control_file.is_open()){
+                    control_file>>temp_date;
+                    this->updateFileTime();
+                    if(temp_date == file_time_buf_) output_file_->open(working_dir_ + temp_date, ios::app);
+                    control_file.close();
+                }
             }
             ~DailyLogFile(){
                 if(output_file_ == nullptr) return;
@@ -135,20 +127,11 @@ namespace SnakeLog{
             }
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
-                if(output_file_ == nullptr) this->prepareFile();
-                else{
-                    // 检查时间
-                    if(!isSameDay()){
-                        output_file_->close();
-                        this->updateFileTime();
-                        ofstream control_file(working_dir_ + ".new");
-                        control_file<<file_time_buf_;
-                        control_file.close();
-                        control_file.open(working_dir_ + ".index", ios::app);
-                        control_file<<file_time_buf_<<endl;
-                        control_file.close();
-                        output_file_->open(working_dir_ + file_time_buf_, ios::app);
-                    }
+                if(!isSameDay() && output_file_->is_open()) output_file_->close();
+                if(!output_file_->is_open()){
+                    this->updateFileTime();
+                    updateDate();
+                    output_file_->open(working_dir_ + file_time_buf_, ios::app);
                 }
                 if(!output_file_->is_open()){
                     cerr<<"文件打开失败.\n";
