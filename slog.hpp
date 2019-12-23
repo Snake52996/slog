@@ -211,6 +211,9 @@ namespace SnakeLog{
                         var_outputted = true;
                         // 跳过"{}"
                         ++format;
+                    }else if(*format == '{' && *(format + 1) == '{'){
+                        buf_<<*format;
+                        ++format;
                     }else{
                         buf_<<*format;
                     }
@@ -242,6 +245,9 @@ namespace SnakeLog{
                         buf_<<first_value;
                         // 跳过"{}"
                         return this->log(format + 2, forward<ARG>(args)...);
+                    }else if(*format == '{' && *(format + 1) == '{'){
+                        buf_<<*format;
+                        ++format;
                     }else{
                         buf_<<*format;
                     }
