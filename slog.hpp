@@ -9,9 +9,9 @@ _Pragma("once");
 #endif
 #include<fstream>
 #include<iostream>
-#include<string>
+#include<string>        // string
 #include<algorithm>     // forward() move()
-#include<sstream>
+#include<sstream>       // stringstream
 #include<ctime>         // tm time_t time() localtime() strftime()
 #include<cstring>       // strcmp
 #include<type_traits>   // is_same
@@ -27,6 +27,12 @@ namespace SnakeLog{
         FATAL,      ///< 致命错误信息
         SILENCE     ///< 不输出错误信息
     };
+    /**
+     * @brief 获取当前时间
+     * @note 获取当前本地时间的格式化后字符串
+     * @param[in] format 说明格式化格式的C-style字符串.与strftime的第三个参数一致.可以是任何可以隐式转换为C-style字符串的格式
+     * @return 返回格式化后的string型字符串结果
+    */
     template<typename T>
     static string __getLocalTime(const T& format){
         auto time0 = time(NULL);
@@ -49,6 +55,12 @@ namespace SnakeLog{
             unsigned int current_index_;                ///< 当前的文件序号
         public:
             LoopLogFile() = delete;
+            /**
+             * @brief 构造循环文件
+             * @param[in] working_dir 输入的工作路径
+             * @pre working_dir应当总是以'/'结尾，并表示一个已存在的且有写权限的文件夹
+             * @warning 不会检查working_dir的合法性
+            */
             LoopLogFile(const string& working_dir){
                 this->working_dir_ = working_dir;
                 this->current_index_ = 0;
@@ -56,6 +68,8 @@ namespace SnakeLog{
             }
             /**
              * @brief 重载<<运算符提供与标准库一致的输出操作
+             * @param[in] output_data 输出的信息，可以是任何可以通过标准流输出的类型
+             * @return 返回自身用于允许连缀输出
              * @warning 并不保证任何文件均不大于最大单个文件大小.文件更改仅发生在两次文件写入之间.
             */
             template<typename T>
