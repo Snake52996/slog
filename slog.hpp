@@ -64,11 +64,22 @@ namespace SnakeLog{
             unsigned int current_index_;                ///< 当前的文件序号
         public:
             LoopLogFile() = delete;
-            LoopLogFile(const string& working_dir){
+            /**
+              * @brief 构造循环文件
+              * @param[in] working_dir 输入的工作路径，可以是任何可以隐式转换为string的类型
+              * @pre working_dir应当总是以'/'结尾，并表示一个已存在的且有写权限的文件夹
+              * @warning 不会检查working_dir的合法性
+             */
+             template<typename STRING_T>
+             LoopLogFile(const STRING_T& working_dir){
                 this->working_dir_ = working_dir;
+                if(working_dir_.back() != '/') working_dir_ += "/";
                 this->current_index_ = 0;
-                this->out_file_.open(this->working_dir_ + "log." + to_string(current_index_));
-            }
+                this->out_file_.open(this->working_dir_ + to_string(current_index_) + ".log");
+             }
+             ~LoopLogFile(){
+                 if(out_file_.is_open()) out_file_.close();
+             }
             /**
              * @brief 重载<<运算符提供与标准库一致的输出操作
              * @warning 并不保证任何文件均不大于最大单个文件大小.文件更改仅发生在两次文件写入之间.
@@ -121,8 +132,10 @@ namespace SnakeLog{
             }
         public:
             DailyLogFile() = delete;
-            DailyLogFile(const string& working_dir):output_file_(){
+            template<typename STRING_T>
+            DailyLogFile(const STRING_T& working_dir):output_file_(){
                 working_dir_ = working_dir;
+                if(working_dir_.back() != '/') working_dir_ += "/";
                 string temp_date;
                 ifstream control_file(working_dir_ + ".new");
                 if(control_file.is_open()){
