@@ -64,10 +64,7 @@ namespace SnakeLog{
             LoopLogFile(const string& working_dir){
                 this->working_dir_ = working_dir;
                 this->current_index_ = 0;
-                this->out_file_.open(this->working_dir_ + to_string(current_index_) + ".log");
-            }
-            ~LoopLogFile(){
-                if(out_file_.is_open()) out_file_.close();
+                this->out_file_.open(this->working_dir_ + "log." + to_string(current_index_));
             }
             /**
              * @brief 重载<<运算符提供与标准库一致的输出操作
