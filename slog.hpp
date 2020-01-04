@@ -25,6 +25,10 @@ namespace SnakeLog{
     #endif
     // 定义各日志等级的简称
     static constexpr char SHORT_LEVEL_CODE[][4] = {"", "[V]", "[D]", "[I]", "[W]", "[E]", "[F]", ""};
+    // 宏定义几种常见的时间格式
+    #define LOG_TIME_FULL_TIME "%Y-%m-%d %H:%M:%S"  ///< 完整时间:年月日时分秒
+    #define LOG_TIME_DATE_TIME "%Y-%m-%d"           ///< 日期时间:年月日
+    #define LOG_TIME_CLOCK_TIME "%H:%M:%S"          ///< 时钟时间:时分秒
     /**
      * @brief 定义日志等级
     */
