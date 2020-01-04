@@ -21,13 +21,14 @@ namespace SnakeLog{
      * @brief 定义日志等级
     */
     enum class LogLevel{
+        ALL,        ///< 输出全部的日志信息
         VERBOSE,    ///< 最多的信息
         DEBUG,      ///< 调试信息
         INFO,       ///< 普通信息
         WARNING,    ///< 警告信息
         ERROR,      ///< 错误信息
         FATAL,      ///< 致命错误信息
-        SILENCE     ///< 不输出错误信息
+        SILENCE     ///< 不输出任何日志信息
     };
     template<typename T>
     static string __getLocalTime(const T& format){
