@@ -9,9 +9,9 @@ _Pragma("once");
 #endif
 #include<fstream>
 #include<iostream>
-#include<string>
+#include<string>        // string
 #include<algorithm>     // forward() move()
-#include<sstream>
+#include<sstream>       // stringstream
 #include<ctime>         // tm time_t time() localtime() strftime()
 #include<cstring>       // strcmp
 #include<type_traits>   // is_same
@@ -42,6 +42,12 @@ namespace SnakeLog{
         FATAL,      ///< 致命错误信息
         SILENCE     ///< 不输出任何日志信息
     };
+    /**
+     * @brief 获取当前时间
+     * @note 获取当前本地时间的格式化后字符串
+     * @param[in] format 说明格式化格式的C-style字符串.与strftime的第三个参数一致.可以是任何可以隐式转换为C-style字符串的格式
+     * @return 返回格式化后的string型字符串结果
+    */
     template<typename T>
     static string __getLocalTime(const T& format){
         auto time0 = time(NULL);
@@ -64,10 +70,10 @@ namespace SnakeLog{
             unsigned int current_index_;                ///< 当前的文件序号
         public:
             LoopLogFile() = delete;
-            /**
+             /**
               * @brief 构造循环文件
               * @param[in] working_dir 输入的工作路径，可以是任何可以隐式转换为string的类型
-              * @pre working_dir应当总是以'/'结尾，并表示一个已存在的且有写权限的文件夹
+              * @pre working_dir应当总是表示一个已存在的且有写权限的文件夹
               * @warning 不会检查working_dir的合法性
              */
              template<typename STRING_T>
@@ -77,11 +83,16 @@ namespace SnakeLog{
                 this->current_index_ = 0;
                 this->out_file_.open(this->working_dir_ + to_string(current_index_) + ".log");
              }
+             /**
+              * @brief 析构时关闭已打开的文件
+             */
              ~LoopLogFile(){
                  if(out_file_.is_open()) out_file_.close();
              }
             /**
              * @brief 重载<<运算符提供与标准库一致的输出操作
+             * @param[in] output_data 输出的信息，可以是任何可以通过标准流输出的类型
+             * @return 返回自身用于允许连缀输出
              * @warning 并不保证任何文件均不大于最大单个文件大小.文件更改仅发生在两次文件写入之间.
             */
             template<typename T>
@@ -104,6 +115,10 @@ namespace SnakeLog{
                 return *this;
             }
     };
+    /**
+     * @brief 封装每日日志文件
+     * 提供与ofstream完全一致的<<操作符操作,按照日期确定输出文件,同一日的日志信息输出至统一文件,多次运行不会覆盖.将在指定的目录下额外产生两个文件,.index包含所有存在的(不为空的)日志文件名(即日志所对应日期),每个一行,.new内容仅一行,为最新的日志文件名
+    */
     class DailyLogFile{
         private:
             string working_dir_;                   ///< 工作路径
@@ -120,6 +135,12 @@ namespace SnakeLog{
                 auto current_tm = *localtime(&time0);
                 strftime(target_buffer, 512, "%Y-%m-%d", &current_tm);
             }
+            /**
+             * @brief 比较上一次输出的日期和当前日期是否一致
+             * @return 若一致则返回true, 否则返回false
+             * @pre 假设last_output_time_buf_已保存好上一次输出的时间
+             * @see SnakeLog::DailyLogFile::updateTimeBuffer
+            */
             bool isSameDay(){
                 updateTimeBuffer(current_output_time_buf_);     // 更新当前时间
                 return (strcmp(current_output_time_buf_, last_output_time_buf_) == 0);
@@ -138,6 +159,13 @@ namespace SnakeLog{
             }
         public:
             DailyLogFile() = delete;
+             /**
+              * @brief 构造每日日志文件
+              * @param[in] working_dir 输入的工作路径，可以是任何可以隐式转换为string的类型
+              * @pre working_dir应当总是表示一个已存在的且有写权限的文件夹
+              * @warning 不会检查working_dir的合法性
+              * @note 不会打开任何写模式的文件.尝试读取控制文件中的.new文件,若存在则将其中的日期读入为上一次输出日期
+             */
             template<typename STRING_T>
             DailyLogFile(const STRING_T& working_dir):output_file_(){
                 working_dir_ = working_dir;
@@ -148,11 +176,20 @@ namespace SnakeLog{
                     control_file.close();
                 }
             }
+            /**
+             * @brief 若析构时写文件正打开,则将其关闭
+            */
             ~DailyLogFile(){
                 if(output_file_.is_open()){
                     output_file_.close();
                 }
             }
+            /**
+             * @brief 重载<<运算符提供与标准库一致的输出操作
+             * @param[in] output_data 输出的信息，可以是任何可以通过标准流输出的类型
+             * @return 返回自身用于允许连缀输出
+             * @see SnakeLog::DailyLogFile::updateSavedTime
+            */
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
                 if(!isSameDay()){   // 当前的日期和上一次输出不同
@@ -178,26 +215,41 @@ namespace SnakeLog{
     class Console{
         public:
             Console(){;}
+            /**
+             * @brief 重载<<运算符提供与cout一致的输出操作
+             * @param[in] output_data 输出的信息，可以是任何可以通过标准流输出的类型
+             * @note 期望完全等效于cout<<output_data
+            */
             template<typename T>
             Console& operator<< (const T& output_data){
                 cout<<output_data;
                 return *this;
             }
     };
+    /**
+     * @brief 封装日志对象,提供各种类型作为输出目标的日志记录功能
+    */
     template<typename OUT_TARGET_T>
     class BasicLog{
         private:
             bool is_first_ = true;          ///< 当前是否为同一次输出中的第一部分
             bool is_colored_ = false;       ///< 当前是否已被染色
         protected:
-            LogLevel log_level_;
-            string logger_name_;
-            string time_format_;
-            OUT_TARGET_T output_target_;
-            stringstream buf_;
-            bool is_console_ = false;
+            LogLevel log_level_;            ///< 日志等级,只有不低于此等级的日志信息才会被输出
+            string logger_name_;            ///< 日志器名称
+            string time_format_;            ///< 日志输出中的时间格式
+            OUT_TARGET_T output_target_;    ///< 日志的输出目标
+            stringstream buf_;              ///< 输出内容缓存
+            bool is_console_ = false;       ///< 当前输出目标是否为控制台
         public:
             BasicLog() = delete;
+            /**
+             * @brief 构造日志器
+             * @param[in] log_level 指定日志等级
+             * @param[in] logger_name 指定日志器名称.可以是任何能够隐式转换为string的类型.留空则不输出
+             * @param[in] time_format 指定时间格式.可以是任何能够隐式转换为string的类型.留空则不输出
+             * @param[in] args 任意数量任意类型的参数包,将被直接转发至输出目标的构造函数
+            */
             template<typename STRING_TYPE_1, typename STRING_TYPE_2, typename...ARG>
             BasicLog(const LogLevel& log_level, const STRING_TYPE_1& logger_name, const STRING_TYPE_2& time_format, ARG&&...args):output_target_(forward<ARG>(args)...){
                 log_level_ = log_level;
@@ -205,9 +257,21 @@ namespace SnakeLog{
                 time_format_ = time_format;
                 is_console_ = is_same<OUT_TARGET_T, Console>();
             }
-            ~BasicLog(){}
+            ~BasicLog(){;}
+            /**
+             * @brief 获取当前的日志等级
+             * @return 返回当前的日志等级
+            */
             inline const LogLevel& level()const noexcept{return this->log_level_;}
+            /**
+             * @brief 设置日志等级
+             * @param[in] log_level 新的日志等级
+            */
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
+            /**
+             * @brief 获取当前的日志器名称
+             * @return 返回当前的日志器名称
+            */
             inline const string& name()const noexcept{return this->logger_name_;}
             /**
              * @brief 设置日志器名称
@@ -233,12 +297,12 @@ namespace SnakeLog{
                     if(time_format_.size()) buf_<<"["<<__getLocalTime(time_format_.c_str())<<"]";
                 }
                 buf_<<output_string;
-                #ifdef _LINUX
                 if(is_colored_){
+                    #ifdef _LINUX
                     buf_<<"\033[0m";
+                    #endif
                     is_colored_ = false;
                 }
-                #endif
                 output_target_<<buf_.str();
                 buf_.str("");
             }
@@ -268,12 +332,12 @@ namespace SnakeLog{
                 if(!var_outputted){
                     cerr<<"提供了多余的参数.该参数为:\n"<<message;
                 }
-                #ifdef _LINUX
                 if(is_colored_){
+                    #ifdef _LINUX
                     buf_<<"\033[0m";
+                    #endif
                     is_colored_ = false;
                 }
-                #endif
                 output_target_<<buf_.str();
                 buf_.str("");
                 is_first_ = true;
@@ -300,9 +364,7 @@ namespace SnakeLog{
                     ++format;
                 }
                 cerr<<"提供了过多的多余的参数.拒绝打印该日志.\n";
-                #ifdef _LINUX
                 is_colored_ = false;
-                #endif
                 buf_.str("");
             }
             template<typename T, typename... ARG>
