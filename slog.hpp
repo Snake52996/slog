@@ -21,6 +21,8 @@ namespace SnakeLog{
      * @brief 定义日志等级
     */
     enum class LogLevel{
+        VERBOSE,    ///< 最多的信息
+        DEBUG,      ///< 调试信息
         INFO,       ///< 普通信息
         WARNING,    ///< 警告信息
         ERROR,      ///< 错误信息
@@ -259,6 +261,32 @@ namespace SnakeLog{
                 is_colored_ = false;
                 #endif
                 buf_.str("");
+            }
+            template<typename T, typename... ARG>
+            void verbose(const T& format, ARG&&...args){
+                if(this->log_level_ > LogLevel::VERBOSE) return;
+                #ifdef _LINUX
+                if(this->is_console_){
+                    buf_<<"\033[34m";
+                    is_colored_ = true;
+                }
+                #endif
+                buf_<<"[V]";
+                is_first_ = true;
+                return this->log(format, forward<ARG>(args)...);
+            }
+            template<typename T, typename... ARG>
+            void debug(const T& format, ARG&&...args){
+                if(this->log_level_ > LogLevel::DEBUG) return;
+                #ifdef _LINUX
+                if(this->is_console_){
+                    buf_<<"\033[36m";
+                    is_colored_ = true;
+                }
+                #endif
+                buf_<<"[D]";
+                is_first_ = true;
+                return this->log(format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void info(const T& format, ARG&&...args){
