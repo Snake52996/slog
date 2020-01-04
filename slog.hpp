@@ -73,7 +73,7 @@ namespace SnakeLog{
              template<typename STRING_T>
              LoopLogFile(const STRING_T& working_dir){
                 this->working_dir_ = working_dir;
-                if(working_dir_.back() != '/') working_dir_ += "/";
+                if(working_dir_.back() != '/') working_dir_ += "/";     // 若路径末尾没有'/'则添加之
                 this->current_index_ = 0;
                 this->out_file_.open(this->working_dir_ + to_string(current_index_) + ".log");
              }
@@ -106,28 +106,34 @@ namespace SnakeLog{
     };
     class DailyLogFile{
         private:
-            string working_dir_;
-            ofstream output_file_;
-            std::tm file_time_;
-            char file_time_buf_[512];
-            char current_time_buf_[512];
-            void updateFileTime(){
-                auto time0 = time(NULL);
-                file_time_ = *localtime(&time0);
-                strftime(file_time_buf_, 512, "%Y-%m-%d", &file_time_);
-            }
-            bool isSameDay(){
+            string working_dir_;                   ///< 工作路径
+            ofstream output_file_;                 ///< 输出文件
+            char last_output_time_buf_[20];        ///< 最近一次输出时的日期(char字符串格式)
+            char current_output_time_buf_[20];     ///< 当前一次输出时的日期(char字符串格式)
+            /**
+             * @brief 将指定的字符串更新为当前的日期
+             * @param[out] target_buffer 指定的C-style字符串
+             * @pre 假定提供的字符串具有足够的空间
+            */
+            void updateTimeBuffer(char*& target_buffer){
                 auto time0 = time(NULL);
                 auto current_tm = *localtime(&time0);
-                strftime(current_time_buf_, 512, "%Y-%m-%d", &current_tm);
-                return (strcmp(current_time_buf_, file_time_buf_) == 0);
+                strftime(target_buffer, 512, "%Y-%m-%d", &current_tm);
             }
-            void updateDate(){
+            bool isSameDay(){
+                updateTimeBuffer(current_output_time_buf_);     // 更新当前时间
+                return (strcmp(current_output_time_buf_, last_output_time_buf_) == 0);
+            }
+            /**
+             * @brief 更新控制文件(.index和.new)中的数据
+             * @note 在.index后追加一行当前的日期,将.new中的数据更换为当前的日期
+            */
+            void updateSavedTime(){
                 ofstream control_file(working_dir_ + ".new");
-                control_file<<file_time_buf_;
+                control_file<<current_output_time_buf_;
                 control_file.close();
                 control_file.open(working_dir_ + ".index", ios::app);
-                control_file<<file_time_buf_<<endl;
+                control_file<<current_output_time_buf_<<endl;
                 control_file.close();
             }
         public:
@@ -136,12 +142,9 @@ namespace SnakeLog{
             DailyLogFile(const STRING_T& working_dir):output_file_(){
                 working_dir_ = working_dir;
                 if(working_dir_.back() != '/') working_dir_ += "/";
-                string temp_date;
                 ifstream control_file(working_dir_ + ".new");
                 if(control_file.is_open()){
-                    control_file>>temp_date;
-                    this->updateFileTime();
-                    if(temp_date == file_time_buf_) output_file_.open(working_dir_ + temp_date, ios::app);
+                    control_file>>last_output_time_buf_;
                     control_file.close();
                 }
             }
@@ -152,13 +155,15 @@ namespace SnakeLog{
             }
             template<typename T>
             DailyLogFile& operator<<(const T& output_message){
-                if(!isSameDay() && output_file_.is_open()) output_file_.close();
-                if(!output_file_.is_open()){
-                    this->updateFileTime();
-                    updateDate();
-                    output_file_.open(working_dir_ + file_time_buf_, ios::app);
+                if(!isSameDay()){   // 当前的日期和上一次输出不同
+                    if(output_file_.is_open()) output_file_.close();
+                    // 现在输出文件已经关闭
+                    updateSavedTime();  // 更新控制文件
+                    strncpy(last_output_time_buf_, current_output_time_buf_, 20);   // 更新上一次输出时间
                 }
-                if(!output_file_.is_open()){
+                // 现在:或者当前的日期和上一次输出的日期一致,否则则保证文件已经关闭,则此时若输出文件未被打开,总应当用当前日期打开之
+                if(!output_file_.is_open()) output_file_.open(working_dir_ + current_output_time_buf_, ios::app);
+                if(!output_file_.is_open()){    // 文件仍未被打开
                     cerr<<"文件打开失败.\n";
                     return *this;
                 }
@@ -182,10 +187,8 @@ namespace SnakeLog{
     template<typename OUT_TARGET_T>
     class BasicLog{
         private:
-            bool is_first_ = true;
-            #ifdef _LINUX
-            bool is_colored_ = false;
-            #endif
+            bool is_first_ = true;          ///< 当前是否为同一次输出中的第一部分
+            bool is_colored_ = false;       ///< 当前是否已被染色
         protected:
             LogLevel log_level_;
             string logger_name_;
@@ -206,9 +209,23 @@ namespace SnakeLog{
             inline const LogLevel& level()const noexcept{return this->log_level_;}
             inline void level(const LogLevel& log_level)noexcept{this->log_level_ = log_level;}
             inline const string& name()const noexcept{return this->logger_name_;}
-            inline void name(const string& logger_name)noexcept{this->logger_name_ = logger_name;}
+            /**
+             * @brief 设置日志器名称
+             * @param[in] log_level 新的日志器名称.可以是任何可以隐式转换为string的类型.留空则不输出
+            */
+            template<typename STRING_TYPE>
+            inline void name(const STRING_TYPE& logger_name)noexcept{this->logger_name_ = logger_name;}
+            /**
+             * @brief 获取当前的时间格式
+             * @return 返回当前的时间格式
+            */
             inline const string& timeFormat()const noexcept{return this->time_format_;}
-            inline void timeFormat(const string& time_format)noexcept{this->time_format_ = time_format;}
+            /**
+             * @brief 设置时间格式
+             * @param[in] log_level 新的时间格式.可以是任何可以隐式转换为string的类型.留空则不输出
+            */
+            template<typename STRING_TYPE>
+            inline void timeFormat(const STRING_TYPE& time_format)noexcept{this->time_format_ = time_format;}
             template<typename T>
             void log(const T& output_string){
                 if(is_first_){
