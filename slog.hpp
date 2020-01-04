@@ -17,15 +17,30 @@ _Pragma("once");
 #include<type_traits>   // is_same
 using namespace std;
 namespace SnakeLog{
+    // 定义终端颜色代码
+    #ifdef _LINUX
+        static constexpr char LEVEL_COLOR_CODE[][6] = {"", "\033[34m", "\033[36m", "\033[37m", "\033[35m", "\033[33m", "\033[31m", ""};
+    #else
+        static constexpr char LEVEL_COLOR_CODE[][6] = {"", "", "", "", "", "", "", ""};
+    #endif
+    // 定义各日志等级的简称
+    static constexpr char SHORT_LEVEL_CODE[][4] = {"", "[V]", "[D]", "[I]", "[W]", "[E]", "[F]", ""};
+    // 宏定义几种常见的时间格式
+    #define LOG_TIME_FULL_TIME "%Y-%m-%d %H:%M:%S"  ///< 完整时间:年月日时分秒
+    #define LOG_TIME_DATE_TIME "%Y-%m-%d"           ///< 日期时间:年月日
+    #define LOG_TIME_CLOCK_TIME "%H:%M:%S"          ///< 时钟时间:时分秒
     /**
      * @brief 定义日志等级
     */
     enum class LogLevel{
+        ALL,        ///< 输出全部的日志信息
+        VERBOSE,    ///< 最多的信息
+        DEBUG,      ///< 调试信息
         INFO,       ///< 普通信息
         WARNING,    ///< 警告信息
         ERROR,      ///< 错误信息
         FATAL,      ///< 致命错误信息
-        SILENCE     ///< 不输出错误信息
+        SILENCE     ///< 不输出任何日志信息
     };
     /**
      * @brief 获取当前时间
@@ -56,16 +71,21 @@ namespace SnakeLog{
         public:
             LoopLogFile() = delete;
             /**
-             * @brief 构造循环文件
-             * @param[in] working_dir 输入的工作路径
-             * @pre working_dir应当总是以'/'结尾，并表示一个已存在的且有写权限的文件夹
-             * @warning 不会检查working_dir的合法性
-            */
-            LoopLogFile(const string& working_dir){
+              * @brief 构造循环文件
+              * @param[in] working_dir 输入的工作路径，可以是任何可以隐式转换为string的类型
+              * @pre working_dir应当总是以'/'结尾，并表示一个已存在的且有写权限的文件夹
+              * @warning 不会检查working_dir的合法性
+             */
+             template<typename STRING_T>
+             LoopLogFile(const STRING_T& working_dir){
                 this->working_dir_ = working_dir;
+                if(working_dir_.back() != '/') working_dir_ += "/";
                 this->current_index_ = 0;
-                this->out_file_.open(this->working_dir_ + "log." + to_string(current_index_));
-            }
+                this->out_file_.open(this->working_dir_ + to_string(current_index_) + ".log");
+             }
+             ~LoopLogFile(){
+                 if(out_file_.is_open()) out_file_.close();
+             }
             /**
              * @brief 重载<<运算符提供与标准库一致的输出操作
              * @param[in] output_data 输出的信息，可以是任何可以通过标准流输出的类型
@@ -120,8 +140,10 @@ namespace SnakeLog{
             }
         public:
             DailyLogFile() = delete;
-            DailyLogFile(const string& working_dir):output_file_(){
+            template<typename STRING_T>
+            DailyLogFile(const STRING_T& working_dir):output_file_(){
                 working_dir_ = working_dir;
+                if(working_dir_.back() != '/') working_dir_ += "/";
                 string temp_date;
                 ifstream control_file(working_dir_ + ".new");
                 if(control_file.is_open()){
@@ -275,56 +297,39 @@ namespace SnakeLog{
                 buf_.str("");
             }
             template<typename T, typename... ARG>
-            void info(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::INFO) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[37m";
-                    is_colored_ = true;
+            void metaLog(const LogLevel& level, const T& format, ARG&&... args){
+                if(log_level_ > level) return;
+                if(is_console_){    // 是在向控制台输出
+                    buf_<<LEVEL_COLOR_CODE[int(level)];     // 染色
+                    is_colored_ = true;                     // 标记已染色
                 }
-                #endif
-                buf_<<"[I]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                buf_<<SHORT_LEVEL_CODE[int(level)];         // 添加等级标识
+                is_first_ = true;                           // 标记为起始
+                return log(format, forward<ARG>(args)...);  // 转发继续处理
+            }
+            template<typename T, typename... ARG>
+            void verbose(const T& format, ARG&&...args){
+                metaLog(LogLevel::VERBOSE, format, forward<ARG>(args)...);
+            }
+            template<typename T, typename... ARG>
+            void debug(const T& format, ARG&&...args){
+                metaLog(LogLevel::DEBUG, format, forward<ARG>(args)...);
+            }
+            template<typename T, typename... ARG>
+            void info(const T& format, ARG&&...args){
+                metaLog(LogLevel::INFO, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void warning(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::WARNING) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[35m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[W]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::WARNING, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void error(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::ERROR) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[33m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[E]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::ERROR, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void fatal(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::FATAL) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[31m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[F]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::FATAL, format, forward<ARG>(args)...);
             }
     };
    typedef BasicLog<Console> ConsoleLog;
