@@ -130,7 +130,7 @@ namespace SnakeLog{
              * @param[out] target_buffer 指定的C-style字符串
              * @pre 假定提供的字符串具有足够的空间
             */
-            void updateTimeBuffer(char*& target_buffer){
+            void updateTimeBuffer(char target_buffer[]){
                 auto time0 = time(NULL);
                 auto current_tm = *localtime(&time0);
                 strftime(target_buffer, 512, "%Y-%m-%d", &current_tm);
