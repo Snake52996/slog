@@ -17,6 +17,14 @@ _Pragma("once");
 #include<type_traits>   // is_same
 using namespace std;
 namespace SnakeLog{
+    // 定义终端颜色代码
+    #ifdef _LINUX
+        static constexpr char LEVEL_COLOR_CODE[][6] = {"", "\033[34m", "\033[36m", "\033[37m", "\033[35m", "\033[33m", "\033[31m", ""};
+    #else
+        static constexpr char LEVEL_COLOR_CODE[][6] = {"", "", "", "", "", "", "", ""};
+    #endif
+    // 定义各日志等级的简称
+    static constexpr char SHORT_LEVEL_CODE[][4] = {"", "[V]", "[D]", "[I]", "[W]", "[E]", "[F]", ""};
     /**
      * @brief 定义日志等级
     */
@@ -264,82 +272,39 @@ namespace SnakeLog{
                 buf_.str("");
             }
             template<typename T, typename... ARG>
-            void verbose(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::VERBOSE) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[34m";
-                    is_colored_ = true;
+            void metaLog(const LogLevel& level, const T& format, ARG&&... args){
+                if(log_level_ > level) return;
+                if(is_console_){    // 是在向控制台输出
+                    buf_<<LEVEL_COLOR_CODE[int(level)];     // 染色
+                    is_colored_ = true;                     // 标记已染色
                 }
-                #endif
-                buf_<<"[V]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                buf_<<SHORT_LEVEL_CODE[int(level)];         // 添加等级标识
+                is_first_ = true;                           // 标记为起始
+                return log(format, forward<ARG>(args)...);  // 转发继续处理
+            }
+            template<typename T, typename... ARG>
+            void verbose(const T& format, ARG&&...args){
+                metaLog(LogLevel::VERBOSE, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void debug(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::DEBUG) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[36m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[D]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::DEBUG, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void info(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::INFO) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[37m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[I]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::INFO, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void warning(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::WARNING) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[35m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[W]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::WARNING, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void error(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::ERROR) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[33m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[E]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::ERROR, format, forward<ARG>(args)...);
             }
             template<typename T, typename... ARG>
             void fatal(const T& format, ARG&&...args){
-                if(this->log_level_ > LogLevel::FATAL) return;
-                #ifdef _LINUX
-                if(this->is_console_){
-                    buf_<<"\033[31m";
-                    is_colored_ = true;
-                }
-                #endif
-                buf_<<"[F]";
-                is_first_ = true;
-                return this->log(format, forward<ARG>(args)...);
+                metaLog(LogLevel::FATAL, format, forward<ARG>(args)...);
             }
     };
    typedef BasicLog<Console> ConsoleLog;
