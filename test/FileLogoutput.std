@@ -1,0 +1,6 @@
+[V]Hello world from slog
+[D]无符号整数:122和有符号整数:42
+[I]浮点数:12.7
+[W]C-style字符串:字符串数据
+[E]混合在一起:122 + 42 + 12.7 = 176.7, 回答正确
+[F]自定义类型:name: Aailo, height: 150, weight: 50
